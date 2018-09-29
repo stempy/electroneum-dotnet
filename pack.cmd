@@ -4,7 +4,8 @@ set thisDir=%~dp0
 set thisDir=%thisDir:~0,-1%
 set buildDir=%thisDir%\Build
 set srcDir=%thisDir%\src
-set debug=--include-symbols --include-source
+set debug=
+rem set debug=--include-symbols --include-source
 
 rem REQUIRE gitversion
 if NOT DEFINED GitVersion echo GitVersion not DEFINED & exit /b 1
