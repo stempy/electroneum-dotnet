@@ -52,13 +52,16 @@ if (payloadResult != null)
 }
 ```
 
-## Web Application Test
-There is a sample website to test the process. You just need to set your apikey and apisecret, either in the appsettings.json file OR environment variables that match the appsettings names.
-
-Set via windows command line
+## Running the Web Application locally without VS Code OR VS 2017
+*NOTE: make sure you have the [DotNet Core](https://www.microsoft.com/net/download) runtimes installed*
+Change directory into the `electroneum-dotnet\src\ElectroneumApiWebApp` directory and type the following in the command line
 
 ```cmd
 set EtnVendorApiKey=yourapikey
 set EtnVendorApiSecretKey=yourapivendorsecretkey
 set EtnOutlet=youroutlet
+dotnet run
 ```
+
+Than open http://localhost:5000 in the browser
+
