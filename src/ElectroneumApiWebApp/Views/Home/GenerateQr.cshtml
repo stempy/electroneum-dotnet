@@ -1,0 +1,48 @@
+﻿@using ElectroneumApiWebApp.Models
+@model ElectroneumApiWebApp.Models.EtnPayloadViewModel
+
+@{
+    ViewBag.Title = "title";
+    Layout = "_Layout";
+
+    var currencies = ViewBag.Currencies as IEnumerable<string>;
+    var currencyList = currencies.Select(x => new SelectListItem(x, x));
+    
+}
+
+<style type="text/css">
+    .qrImage {
+        padding: 20px;
+    }
+</style>
+
+<h2>Generate QR for amount and currency</h2>
+
+
+
+
+<form asp-action="GenerateQr">
+
+    <label asp-for="Amount" class="form-label">
+       Amount <input class="form-control" asp-for="Amount" value="@Model.Amount" />
+    </label>
+    <label asp-for="Currency">
+        Currency 
+        <select asp-for="Currency" asp-items="@currencyList" class="form-control">
+        </select>
+    </label>
+    
+    <label asp-for="AmountEtn">
+        Amount ETN <input class="form-control" asp-for="AmountEtn" readonly="readonly" disabled="disabled" value="@Model.AmountEtn" />
+    </label>
+    
+    @if (Model !=null && !string.IsNullOrEmpty(Model.QrUrl))
+    {
+        <div class="qrImage">
+            <img src="@Model.QrUrl" />
+        </div>
+    }
+
+
+    <input type="submit" class="btn" />
+</form>

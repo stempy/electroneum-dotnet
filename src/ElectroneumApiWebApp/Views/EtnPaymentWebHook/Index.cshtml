@@ -1,0 +1,15 @@
+﻿@model ElectroneumApiClient.EtnPayload
+@{
+    ViewBag.Title = "Test Web Hook";
+    Layout = "_Layout";
+}
+
+<h2>Test WebHook</h2>
+
+<form method="Post">
+    <label asp-for="Amount">Amount ETN</label> <input asp-for="Amount" class="form-control" value="@Model.Amount" />
+    <label asp-for="Customer">Customer</label> <input asp-for="Customer" class="form-control" value="@Model.Customer" />
+    
+    <input type="submit" class="btn" />
+
+</form>
