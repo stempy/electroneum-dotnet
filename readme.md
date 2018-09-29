@@ -1,6 +1,6 @@
 # Electroneum C# DotNetCore REST api Library
 
-This is a C# port of the ETN Instant Payment API from [ETN Rest API Guide](https://community.electroneum.com/t/using-the-etn-instant-payment-api/121) and [PHP Vendor Lib](https://github.com/electroneum/vendor-php). 
+This is a .NETStandard 2.0 C# port of the ETN Instant Payment API from [ETN Rest API Guide](https://community.electroneum.com/t/using-the-etn-instant-payment-api/121) and [PHP Vendor Lib](https://github.com/electroneum/vendor-php). 
 
 There is a nuget package for the libray at [Electroneum Nuget](https://www.nuget.org/packages/ElectroneumApiClient/)
 
@@ -52,3 +52,13 @@ if (payloadResult != null)
 }
 ```
 
+## Web Application Test
+There is a sample website to test the process. You just need to set your apikey and apisecret, either in the appsettings.json file OR environment variables that match the appsettings names.
+
+Set via windows command line
+
+```cmd
+set EtnVendorApiKey=yourapikey
+set EtnVendorApiSecretKey=yourapivendorsecretkey
+set EtnOutlet=youroutlet
+```
