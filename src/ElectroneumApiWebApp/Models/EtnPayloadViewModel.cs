@@ -7,5 +7,7 @@
         public string Currency { get; set; }
         public string Reference { get; set; }
         public string QrUrl { get; set; }
+
+        public int ImageSize { get; set; }
     }
 }

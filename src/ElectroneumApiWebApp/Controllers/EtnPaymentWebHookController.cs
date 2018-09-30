@@ -13,10 +13,10 @@ namespace ElectroneumApiWebApp.Controllers
     [Route("etnwebhook")]
     public class EtnPaymentWebHookController : Controller
     {
+        private static string _testingSig;
+        private readonly EtnOutletOptions _outletOptions;
         private readonly EtnWebhookValidator _webhookValidator;
         private readonly ILogger<EtnPaymentWebHookController> _logger;
-        private readonly EtnOutletOptions _outletOptions;
-
         private readonly IEtnVendor _vendor;// this is not needed for validation, only to generate signature for testing
 
         public EtnPaymentWebHookController(EtnWebhookValidator webhookValidator, 
@@ -30,16 +30,39 @@ namespace ElectroneumApiWebApp.Controllers
             _outletOptions = outletOptions.Value;
         }
 
-        private static string _testingSig;
-
-        private string GetEtnXTestingSig()
+        /// <summary>
+        /// Actual validation process
+        /// </summary>
+        /// <param name="payload"></param>
+        /// <returns></returns>
+        private async Task<EtnPayload> ValidatePayload(EtnPayload payload)
         {
-            if (_testingSig == null)
+            bool isTesting = Request.Headers.ContainsKey("X-ETN-TESTING");
+            if (isTesting)
             {
-                _testingSig = Guid.NewGuid().ToString();
+                if ((string)Request.Headers["X-ETN-TESTING"] != GetEtnXTestingSig())
+                {
+                    throw new Exception($"Invalid testing signature");
+                }
+            }
+            var userAgent = GetHeaderOrThrow("User-Agent");
+            var signature = GetHeaderOrThrow(EtnConstants.EtnSignatureRequestHeader);
+            _logger.LogTrace("Validating payload {0} ", payload);
+
+            if (isTesting)
+            {
+                userAgent = "Electroneum";
             }
 
-            return _testingSig;
+            var payloadResult = await _webhookValidator.ValidateEtnWebHookPayloadAsync(userAgent, payload, signature);
+            if (payloadResult != null)
+            {
+                // success result
+                // log and store in database table somewhere
+                _logger.LogInformation($"[Test:{isTesting}] Payment Received: timestamp:{payloadResult.TimeStamp} id:{payloadResult.PaymentId} amt:{payloadResult.Amount} customer:{payloadResult.Customer} ref:{payloadResult.Ref} ");
+                // handle fulfulment process
+            }
+            return payloadResult;
         }
 
         /// <summary>
@@ -51,42 +74,15 @@ namespace ElectroneumApiWebApp.Controllers
         [HttpPost("payment")]
         public async Task<IActionResult> PostEtnWebHook(EtnPayload payload)
         {
-            bool isTesting = Request.Headers.ContainsKey("X-ETN-TESTING");
-            if (isTesting)
-            {
-                if ((string) Request.Headers["X-ETN-TESTING"] != GetEtnXTestingSig())
-                {
-                    throw new Exception($"Invalid testing signature");
-                }
-            }
-
             try
             {
-                var userAgent = GetHeaderOrThrow("User-Agent");
-                var signature = GetHeaderOrThrow(EtnConstants.EtnSignatureRequestHeader);
-                _logger.LogTrace("Validating payload {0} ",payload);
-
-                if (isTesting)
-                {
-                    userAgent = "Electroneum";
-                }
-
-                var payloadResult = await _webhookValidator.ValidateEtnWebHookPayloadAsync(userAgent, payload, signature);
-                if (payloadResult != null)
-                {
-                    // success result
-                    // log and store in database table somewhere
-                    _logger.LogInformation($"[Test:{isTesting}] Payment Received: timestamp:{payloadResult.TimeStamp} id:{payloadResult.PaymentId} amt:{payloadResult.Amount} customer:{payloadResult.Customer} ref:{payloadResult.Ref} ");
-
-                    // handle fulfulment process
-                }
+                var payloadResult = await ValidatePayload(payload);
             }
             catch (VendorException vex)
             {
-                ModelState.AddModelError("",vex.Message);
+                ModelState.AddModelError("", vex.Message);
                 return new BadRequestObjectResult(ModelState);
             }
-
             return new OkResult();
         }
 
@@ -116,10 +112,27 @@ namespace ElectroneumApiWebApp.Controllers
             Request.Headers.Add("X-ETN-TESTING", GetEtnXTestingSig());
             //Request.Headers.FirstOrDefault(x=>x.Key=="User-Agent").Value = new StringValues("Electroneum/0.1.0 (+https://electroneum.com/instant-payments)");
 
-
-            return await PostEtnWebHook(model);
+            try
+            {
+                var payloadResult = await ValidatePayload(model);
+                ViewBag.IsValidPayload = true;
+            }
+            catch (VendorException vex)
+            {
+                ModelState.AddModelError("", vex.Message);
+            }
+            return View(model);
         }
 
+        #region [Helpers]
+        private string GetEtnXTestingSig()
+        {
+            if (_testingSig == null)
+            {
+                _testingSig = Guid.NewGuid().ToString();
+            }
+            return _testingSig;
+        }
 
         private string GetHeaderOrThrow(string header)
         {
@@ -127,7 +140,7 @@ namespace ElectroneumApiWebApp.Controllers
                 return Request.Headers.FirstOrDefault(x => x.Key == header).Value;
             throw new VendorException($"Missing header-{header}");
         }
-
+        #endregion
 
     }
 }

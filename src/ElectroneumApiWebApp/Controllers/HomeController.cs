@@ -33,11 +33,16 @@ namespace ElectroneumApiWebApp.Controllers
         {
             ViewBag.Currencies = _etnVendor.Currencies;
             model.AmountEtn = await _etnVendor.CurrencyToEtnAsync(model.Amount, model.Currency);
-            var result = await _etnVendor.GetQrAsync(model.Amount, model.Currency, _etnOptions.EtnOutlet, "a23456789b");
+
+            var width = 250;  // optional
+            var height = 250; // optional
+            var samplePaymentId = "a23456789b"; // optional
+
+            var result = await _etnVendor.GetQrAsync(model.Amount, model.Currency, _etnOptions.EtnOutlet, samplePaymentId);
+            //var result = await _etnVendor.GetQrAsync(model.Amount, model.Currency, _etnOptions.EtnOutlet, samplePaymentId,width,height);
             model.QrUrl = result;
-
             _logger.LogInformation("Generated QR for :{0}",model);
-
+            ViewBag.QrCodeString = result.Substring(result.IndexOf("chl=", StringComparison.Ordinal) + 4);
             return View(model);
         }
 

@@ -38,7 +38,7 @@ namespace ElectroneumApiClient
         /// <summary>
         /// Url to load a QR code.
         /// </summary>
-        public const string URL_QR = "https://chart.googleapis.com/chart?cht=qr&chs=300x300&chld=L|0&chl=";
+        public const string URL_QR = "https://chart.googleapis.com/chart?cht=qr&chs={0}x{1}&chld=L|0&chl={2}";
 
         /// <summary>
         /// Currencies accepted for converting to ETN.
@@ -46,6 +46,8 @@ namespace ElectroneumApiClient
         protected string[] currencies = new[] { "AUD", "BRL", "BTC", "CAD", "CDF", "CHF", "CLP", "CNY", "CZK", "DKK", "EUR", "GBP", "HKD", "HUF", "IDR", "ILS", "INR", "JPY", "KRW", "MXN", "MYR", "NOK", "NZD", "PHP", "PKR", "PLN", "RUB", "SEK", "SGD", "THB", "TRY", "TWD", "USD", "ZAR" };
 
         public IEnumerable<string> Currencies => currencies;
+
+      
 
         /// <summary>
         /// Your vendor API key.
@@ -72,8 +74,6 @@ namespace ElectroneumApiClient
         /// </summary>
         public string PaymentId { get; set; }
 
-        
-
         /// <summary>
         /// cached currency list
         /// </summary>
@@ -84,6 +84,10 @@ namespace ElectroneumApiClient
         /// as electroneum only want 1 poll per second
         /// </summary>
         private static DateTime _lastPoll = DateTime.Now.AddHours(-1);
+
+
+        public int QrImageWidth { get; set; } = 300;  // 600 fails with 400
+        public int QrImageHeight { get; set; } = 300; // 600 fails with 400
 
         #region [Ctors..]
         public EtnVendor(string apiKey, string apiSecret)
@@ -116,26 +120,20 @@ namespace ElectroneumApiClient
             }
         }
 
-        /// <summary>
-        /// Convert local currency to ETN
-        /// </summary>
-        /// <param name="amount"></param>
-        /// <param name="currency"></param>
-        /// <returns></returns>
-        public async Task<decimal> CurrencyToEtnAsync(decimal amount, string currency, bool forceRefresh=false)
+        #region [Get Currency Rate]
+
+        private async Task<decimal> GetCurrencyRateAsync(string currency, bool forceRefresh = false)
         {
             // clear currency list 
             if (forceRefresh)
                 _currencyList = null;
-            
-            
+
             // Check the currency is accepted.
             if (!currencies.Contains(currency.ToUpper()))
             {
                 throw new VendorException("Unknown currency");
             }
 
-            // TODO: cache currency list
             if (_currencyList == null)
             {
                 // Get the JSON conversion data.
@@ -148,6 +146,7 @@ namespace ElectroneumApiClient
                         {
                             throw new VendorException($"[{res.StatusCode}] could not load currency conversion JSON");
                         }
+
                         var value = await res.Content.ReadAsStringAsync();
                         _currencyList = JObject.Parse(value);
                     }
@@ -157,7 +156,6 @@ namespace ElectroneumApiClient
                     }
                 }
             }
-
             var currencyRateField = $"price_{currency.ToLower()}";
             if (!_currencyList.ContainsKey(currencyRateField))
                 throw new VendorException($"could not get rate for currency {currency}");
@@ -170,13 +168,39 @@ namespace ElectroneumApiClient
                 throw new VendorException("Currency conversion rate not valid");
             }
 
-            // TODO: work this out
-            Etn = amount / rateDec;
+            return rateDec;
+        }
 
+        /// <summary>
+        /// Convert ETN to local currency
+        /// </summary>
+        /// <param name="etnAmount"></param>
+        /// <param name="currency"></param>
+        /// <param name="forceRefresh"></param>
+        /// <returns></returns>
+        public async Task<decimal> EtnToCurrencyAsync(decimal etnAmount, string currency, bool forceRefresh = false)
+        {
+            var rate = await GetCurrencyRateAsync(currency, forceRefresh);
+            var localAmt = etnAmount * rate;
+            localAmt = Convert.ToDecimal(string.Format("{0:#.00}", Convert.ToDecimal(localAmt.ToString())));
+            return localAmt;
+        }
+
+        /// <summary>
+        /// Convert local currency to ETN
+        /// </summary>
+        /// <param name="amount"></param>
+        /// <param name="currency"></param>
+        /// <returns></returns>
+        public async Task<decimal> CurrencyToEtnAsync(decimal amount, string currency, bool forceRefresh=false)
+        {
+            var rateDec = await GetCurrencyRateAsync(currency);
+            Etn = amount / rateDec;
             Etn = Convert.ToDecimal(string.Format("{0:#.00}", Convert.ToDecimal(Etn.ToString())));
             return Etn;
         }
 
+        #endregion [Get Currency Rate]
 
         #region [Qr code]
         /// <summary>
@@ -189,11 +213,25 @@ namespace ElectroneumApiClient
         /// <returns></returns>
         public async Task<string> GetQrAsync(decimal amount, string currency, string outlet, string paymentId = null)
         {
-            // Convert the currency.
+            return await GetQrAsync(amount, currency, outlet, paymentId, QrImageWidth, QrImageHeight); //   GetQrUrl(qrCode);
+        }
+
+        /// <summary>
+        /// Get qr image url and set width/height
+        /// </summary>
+        /// <param name="amount"></param>
+        /// <param name="currency"></param>
+        /// <param name="outlet"></param>
+        /// <param name="paymentId"></param>
+        /// <param name="width"></param>
+        /// <param name="height"></param>
+        /// <returns></returns>
+        public async Task<string> GetQrAsync(decimal amount, string currency, string outlet, string paymentId, int width, int height)
+        {
             Etn = await CurrencyToEtnAsync(amount, currency);
             // Build the QR Code string.
             var qrCode = GetQrCode(Etn, outlet, paymentId);
-            return GetQrUrl(qrCode);
+            return GetQrUrl(qrCode, width, height);
         }
 
         /// <summary>
@@ -242,12 +280,23 @@ namespace ElectroneumApiClient
         /// <returns></returns>
         private string GetQrUrl(string qrCode)
         {
-            return $"{URL_QR}{qrCode}";// sprintf(Vendor::URL_QR, urlencode($qrCode));
+            return string.Format(URL_QR,QrImageWidth,QrImageHeight,qrCode);// sprintf(Vendor::URL_QR, urlencode($qrCode));
         }
 
-      
+        /// <summary>
+        /// Get qr url with specific width/height dimensions
+        /// </summary>
+        /// <param name="qrCode"></param>
+        /// <param name="width"></param>
+        /// <param name="height"></param>
+        /// <returns></returns>
+        private string GetQrUrl(string qrCode, int width, int height)
+        {
+            return string.Format(URL_QR, width, height, qrCode);// sprintf(Vendor::URL_QR, urlencode($qrCode));
+        }
+
         #endregion
-  
+
         #region [Generate Signature]
 
         public async Task<string> GenerateSignature(EtnPayload payload)

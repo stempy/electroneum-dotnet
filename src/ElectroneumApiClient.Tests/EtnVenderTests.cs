@@ -18,13 +18,22 @@ namespace ElectroneumApiClient.Tests
             _out.WriteLine(paymentId);
         }
 
+        /// <summary>
+        /// Verify currency conversion is accurate both ways
+        /// </summary>
+        /// <returns></returns>
         [Fact]
-        public async Task ConvertAUCurrencyToEtn()
+        public async Task ConvertAUCurrencyToEtnAndBack()
         {
             var currency = "aud";
             var vender = _mock.CreateVendor();
-            var i = await vender.CurrencyToEtnAsync(_mock.GetAmt(), currency);
-            _out.WriteLine(i.ToString());
+            var amt = _mock.GetAmt();
+
+            var etn = await vender.CurrencyToEtnAsync(amt, currency);
+            var local = await vender.EtnToCurrencyAsync(etn, currency);
+
+            _out.WriteLine($"etn:{etn} local:{local}");
+            Assert.Equal(local,amt);
         }
 
         [Fact]
